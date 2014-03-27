@@ -1,5 +1,7 @@
 package com.xebialabs.overthere.nio.file;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,12 +18,13 @@ import java.nio.file.spi.FileSystemProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Closeables;
-
 import com.xebialabs.overthere.*;
 
 import static com.google.common.collect.Maps.newHashMap;
@@ -120,10 +123,20 @@ public abstract class OverthereFileSystemProvider extends FileSystemProvider {
     @Override
     public SeekableByteChannel newByteChannel(final Path path, final Set<? extends OpenOption> options, final FileAttribute<?>... attrs) throws IOException {
         OverthereFile ofile = ((OvertherePath) path).getOverthereFile();
+
+        
+        if (options.size() == 0 && ofile.getInputStream() instanceof FileInputStream) {
+            return ((FileInputStream) ofile.getInputStream()).getChannel();
+        }
+        
+        if (ofile.getOutputStream() instanceof FileOutputStream && !Sets.intersection(options, newHashSet(StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.CREATE_NEW)).isEmpty()) {
+            return ((FileOutputStream) ofile.getOutputStream()).getChannel();
+        }
+        
         final InputStream in;
         final OutputStream out;
 
-        if (options.contains(StandardOpenOption.READ)) {
+        if (options.contains(StandardOpenOption.READ) || options.size() == 0) {
             in = ofile.getInputStream();
         } else {
             in = null;
@@ -134,55 +147,9 @@ public abstract class OverthereFileSystemProvider extends FileSystemProvider {
         } else {
             out = null;
         }
-
-        return new SeekableByteChannel() {
-            @Override
-            public boolean isOpen() {
-                return true;
-            }
-
-            @Override
-            public void close() throws IOException {
-                Closeables.closeQuietly(in);
-                Closeables.closeQuietly(out);
-            }
-
-            @Override
-            public int write(ByteBuffer src) throws IOException {
-                int remaining = src.remaining();
-                out.write(src.array(), 0, remaining);
-                src.position(remaining);
-                return remaining;
-            }
-
-            @Override
-            public SeekableByteChannel truncate(long size) throws IOException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long size() throws IOException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public int read(ByteBuffer dst) throws IOException {
-                byte[] buf = new byte[dst.remaining()];
-                int bytesRead = in.read(buf);
-                dst.put(buf, 0, bytesRead);
-                return bytesRead;
-            }
-
-            @Override
-            public SeekableByteChannel position(long newPosition) throws IOException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long position() throws IOException {
-                throw new UnsupportedOperationException();
-            }
-        };
+        
+        return new OverthereSeekableByteChannel(path, in, out);
+                
     }
 
     @Override

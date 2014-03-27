@@ -12,7 +12,7 @@ import static com.xebialabs.overthere.ssh.SshConnectionBuilder.SSH_PROTOCOL;
 public class SshInteractiveSudoFileSystemProvider extends OverthereFileSystemProvider {
     @Override
     public String getScheme() {
-        return SshConnectionBuilder.SSH_PROTOCOL + "+interactive_sudo";
+        return SshConnectionBuilder.SSH_PROTOCOL + "+interactive-sudo";
     }
 
     @Override
